@@ -1,4 +1,3 @@
-#                    role_name = role_name.strip().lower().replace(":", "").replace(" ", "-")
 import os
 import discord
 import csv
