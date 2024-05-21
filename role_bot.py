@@ -2,6 +2,7 @@
 import os
 import discord
 import csv
+import random
 from discord.ext import commands
 from dotenv import load_dotenv # dependancy. Run "pip install -U python-dotenv" to install
 
@@ -29,8 +30,11 @@ async def on_ready():
 async def on_message(message):
     if message.author == client.user:
         return
-    
     await client.process_commands(message)
+
+# Function to clean and format channel names
+def format_channel_name(name):
+    return name.strip().lower().replace(":", "-").replace(" ", "-").replace("&", "n").replace(".", "")
 
 @client.command(name='create_roles', help='Create roles from CSV column 2')
 async def create_roles(message):
@@ -182,6 +186,7 @@ async def create_channels(message, category_name):
         await message.channel.send("You do not have permission to use this command.")
         return
 
+    created_channels = set()
     # Get the guild from the message
     guild = message.guild
 
@@ -206,7 +211,13 @@ async def create_channels(message, category_name):
             for channel_name in channel_names:
                 #save role name and then format role name into a channel name
                 role_name = channel_name
-                channel_name = channel_name.strip().lower().replace(":", "-").replace(" ", "-").replace("&", "n"). replace(".", "")
+                #channel_name = channel_name.strip().lower().replace(":", "-").replace(" ", "-").replace("&", "n"). replace(".", "")
+                channel_name = format_channel_name(channel_name)
+
+                # Check if the channel has already been processed
+                if channel_name in created_channels:
+                    continue
+                
                 # Check if the channel already exists
                 existing_channel = discord.utils.get(guild.channels, name=channel_name)
                 if existing_channel:
@@ -215,6 +226,9 @@ async def create_channels(message, category_name):
                     # Create the channel under the specified category
                     channel = await guild.create_text_channel(channel_name, category=category)
                     await message.channel.send(f"Created channel {channel_name} under category {category_name}.")
+
+                    # Add the channel to the set of processed channels
+                    created_channels.add(channel_name)
 
                     # Check if a role with the same name already exists
                     role = discord.utils.get(guild.roles, name=role_name)
@@ -231,16 +245,8 @@ async def delete_channels(message, category_name):
         await message.channel.send("You do not have permission to use this command.")
         return
 
-    # Extract category name from the command
-    #command_parts = message.content.split(' ', 1)
-    # if len(command_parts) < 2:
-    #     await message.channel.send("Please provide a category name.")
-    #     return
-
-    #category_name = command_parts[1]
-
-    # Get the guild from the message
     guild = message.guild
+    deleted_channels = set()
 
     # Get the category object
     category = discord.utils.get(guild.categories, name=category_name)
@@ -257,11 +263,17 @@ async def delete_channels(message, category_name):
             if not row:
                 continue
 
-            # looks up channel names
-            channel_names = [name.strip().lower().replace(":", "-").replace(" ", "-").replace("&", "n"). replace(".", "") for name in row[1].split(',')]
+
+            # Look up channel names using the format_channel_name function
+            channel_names = [format_channel_name(name) for name in row[1].split(',')]
+
 
             # Iterate through channel names
             for channel_name in channel_names:
+                if channel_name in deleted_channels:
+                    continue
+                # Add the channel to the set of processed channels
+                deleted_channels.add(channel_name)
                 # Check if the channel exists in the category and delete it
                 channel = discord.utils.get(category.channels, name=channel_name)
                 if channel:
